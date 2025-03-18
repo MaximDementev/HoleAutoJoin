@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AutoJoinOpening.cs" />
+    <Compile Include="JoinCommand.cs" />
     <Compile Include="JoinCommand_EventHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

@@ -1,6 +1,7 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -10,53 +11,73 @@ using System.Linq;
 public class JoinCommand_EventHandler : IExternalEventHandler
 {
     #region Private Fields
-    private List<FamilyInstance> _addedElements = new List<FamilyInstance>();
+    private List<FamilyInstance> _elementsToJoin = new List<FamilyInstance>();
     private ExternalEvent _externalEvent;
+    private bool _isProcessing = false; // Флаг для предотвращения повторной обработки
     #endregion
+
+    public int Count = 0;
 
     #region Constructor
     public JoinCommand_EventHandler()
     {
-        Initialize();
-    }
-
-    public void Initialize()
-    {
         _externalEvent = ExternalEvent.Create(this);
     }
 
-    public void Raise(List<FamilyInstance> addedElements)
+    public void AddElements(List<FamilyInstance> elementsToJoin)
     {
-        _addedElements = addedElements;
+        _elementsToJoin.AddRange(elementsToJoin);
+    }
+
+
+    public void Raise()
+    {
+        if (_isProcessing || _elementsToJoin.Count == 0) return;
+
+        _isProcessing = true;
+        _elementsToJoin = new HashSet<FamilyInstance>(_elementsToJoin).ToList();
         _externalEvent.Raise();
     }
+
     #endregion
     //------------------------- Methods -----------------------------------------------------
 
     public void Execute(UIApplication app)
     {
-        if (_addedElements == null || !_addedElements.Any()) return;
+        if (_elementsToJoin == null || !_elementsToJoin.Any()) return;
 
         Document doc = app.ActiveUIDocument?.Document;
         if (doc == null) return;
 
-        using (Transaction trans = new Transaction(doc, $"Соединение с основой {_addedElements.Count} отверстий"))
+        try
         {
-            trans.Start();
-
-            foreach (FamilyInstance familyInstance in _addedElements)
+            using (Transaction trans = new Transaction(doc, $"Соединение {_elementsToJoin.Count} отверстий"))
             {
-                Element host = familyInstance.Host;
+                trans.Start();
 
-                if (host != null && !JoinGeometryUtils.AreElementsJoined(doc, familyInstance, host))
+                foreach (FamilyInstance familyInstance in _elementsToJoin.Distinct()) // Убираем дубликаты
                 {
-                    JoinGeometryUtils.JoinGeometry(doc, familyInstance, host);
+                    if (familyInstance?.Host != null && !JoinGeometryUtils.AreElementsJoined(doc, familyInstance, familyInstance.Host))
+                    {
+                        JoinGeometryUtils.JoinGeometry(doc, familyInstance, familyInstance.Host);
+                    }
                 }
-            }
 
-            trans.Commit();
+                trans.Commit();
+            }
+        }
+        catch (Exception ex)
+        {
+            TaskDialog.Show("Error", $"Error during geometry join: {ex.Message}");
+        }
+        finally
+        {
+            _elementsToJoin.Clear();
+            Count = 0;
+            _isProcessing = false;
         }
     }
+
 
 
     public string GetName()
