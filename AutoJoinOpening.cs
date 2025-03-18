@@ -33,8 +33,6 @@ public class AutoJoinOpening : IExternalApplication
         .Where(fi => fi.Symbol.Family.Name.StartsWith("Отверстие_Плита_"))
         .ToList();
 
-        if (!changedOrAddedElements.Any()) return;
-
-        _joinCommand.Raise(changedOrAddedElements);
+        if (changedOrAddedElements.Any()) _joinCommand.Raise(changedOrAddedElements);
     }
 }

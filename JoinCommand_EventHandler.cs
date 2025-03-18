@@ -40,7 +40,7 @@ public class JoinCommand_EventHandler : IExternalEventHandler
         Document doc = app.ActiveUIDocument?.Document;
         if (doc == null) return;
 
-        using (Transaction trans = new Transaction(doc, "Join Openings"))
+        using (Transaction trans = new Transaction(doc, $"Соединение с основой {_addedElements.Count} отверстий"))
         {
             trans.Start();
 
