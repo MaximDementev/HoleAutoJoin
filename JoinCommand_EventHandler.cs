@@ -13,10 +13,7 @@ public class JoinCommand_EventHandler : IExternalEventHandler
     #region Private Fields
     private List<FamilyInstance> _elementsToJoin = new List<FamilyInstance>();
     private ExternalEvent _externalEvent;
-    private bool _isProcessing = false; // Флаг для предотвращения повторной обработки
     #endregion
-
-    public int Count = 0;
 
     #region Constructor
     public JoinCommand_EventHandler()
@@ -24,18 +21,12 @@ public class JoinCommand_EventHandler : IExternalEventHandler
         _externalEvent = ExternalEvent.Create(this);
     }
 
-    public void AddElements(List<FamilyInstance> elementsToJoin)
+
+    public void Raise(List<FamilyInstance> elementsToJoin)
     {
-        _elementsToJoin.AddRange(elementsToJoin);
-    }
+        if (elementsToJoin.Count == 0) return;
+        _elementsToJoin = elementsToJoin;
 
-
-    public void Raise()
-    {
-        if (_isProcessing || _elementsToJoin.Count == 0) return;
-
-        _isProcessing = true;
-        _elementsToJoin = new HashSet<FamilyInstance>(_elementsToJoin).ToList();
         _externalEvent.Raise();
     }
 
@@ -51,11 +42,11 @@ public class JoinCommand_EventHandler : IExternalEventHandler
 
         try
         {
-            using (Transaction trans = new Transaction(doc, $"Соединение {_elementsToJoin.Count} отверстий"))
+            using (Transaction trans = new Transaction(doc, $"Автоматическое соединение отверстий с плитой"))
             {
                 trans.Start();
 
-                foreach (FamilyInstance familyInstance in _elementsToJoin.Distinct()) // Убираем дубликаты
+                foreach (FamilyInstance familyInstance in _elementsToJoin.Distinct())
                 {
                     if (familyInstance?.Host != null && !JoinGeometryUtils.AreElementsJoined(doc, familyInstance, familyInstance.Host))
                     {
@@ -68,13 +59,7 @@ public class JoinCommand_EventHandler : IExternalEventHandler
         }
         catch (Exception ex)
         {
-            TaskDialog.Show("Error", $"Error during geometry join: {ex.Message}");
-        }
-        finally
-        {
-            _elementsToJoin.Clear();
-            Count = 0;
-            _isProcessing = false;
+            TaskDialog.Show("Ошибка", $"{ex.Message}");
         }
     }
 

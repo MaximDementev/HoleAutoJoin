@@ -5,6 +5,8 @@ using System.Linq;
 using System.IO;
 using System.Reflection;
 using System;
+using System.Windows.Media.Imaging;
+using System.Collections.Generic;
 
 public class AutoJoinOpening : IExternalApplication
 {
@@ -22,28 +24,20 @@ public class AutoJoinOpening : IExternalApplication
         //-----------------------------------------
         string assemblyLocation = Assembly.GetExecutingAssembly().Location,iconsDirectoryPath = Path.GetDirectoryName(assemblyLocation) + @"\icons\";
 
-        string tabName = "KRGP";
-        string panelName = "PANELNAME";
-        string ribbonName = "BUTTONNAME";
-
-
-        try
-        {
-            application.CreateRibbonTab(tabName);
-        }
-        catch { }
+        string panelName = "Проемы и отверстия";
+        string ribbonName = "Соединить отверстия с плитой";
 
         #region 1. SPECIFIC
         {
-            RibbonPanel panel = application.GetRibbonPanels(tabName).Where(p => p.Name == panelName).FirstOrDefault();
-            if (panel == null)
-            {
-                panel = application.CreateRibbonPanel(tabName, panelName);
-            }
+            IList<RibbonPanel> panels = application.GetRibbonPanels(Tab.AddIns);
+            RibbonPanel panel = panels.FirstOrDefault(p => p.Name == panelName);
+            if (panel == null)panel = application.CreateRibbonPanel(Tab.AddIns, panelName);
 
             panel.AddItem(new PushButtonData(nameof(JoinCommand), ribbonName, assemblyLocation, typeof(JoinCommand).FullName)
             {
-                //LargeImage = new BitmapImage(new Uri(iconsDirectoryPath + "IMAGENAME.png"))
+                LargeImage = new BitmapImage(new Uri(iconsDirectoryPath + "HoleAutoJoinIco.png")),
+                LongDescription = "Соединение отверстий выполняется автоматически. Запускать при необходимости. " +
+                "Соединяет все отверстия в плитах с их основами. Перед запуском рекомендуется синхронизироваться"
             });
         }
         #endregion
@@ -66,24 +60,15 @@ public class AutoJoinOpening : IExternalApplication
 
             var changedOrAddedElements = new FilteredElementCollector(doc)
                 .OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
-                .Where(fi => fi.Symbol.Family.Name.StartsWith("Отверстие_"))
+                .Where(fi => fi.Symbol.Family.Name.StartsWith("Отверстие_Плита_"))
                 .ToList();
 
             if (changedOrAddedElements.Any())
-            {
-                _joinCommand_EventHandler.AddElements(changedOrAddedElements);
-
-                if (_joinCommand_EventHandler.Count < 10)
-                {
-                    _joinCommand_EventHandler.Count++;
-                    return;
-                }
-                _joinCommand_EventHandler.Raise();
-            }
+                _joinCommand_EventHandler.Raise(changedOrAddedElements);
         }
         catch (Exception ex)
         {
-            TaskDialog.Show("Error", $"Error processing document change: {ex.Message}");
+            TaskDialog.Show("Ошибка", $"{ex.Message}");
         }
     }
 
