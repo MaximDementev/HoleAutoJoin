@@ -49,6 +49,8 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -63,12 +65,24 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AutoJoinOpening.cs" />
+    <Compile Include="OpenForm.cs" />
     <Compile Include="JoinCommand.cs" />
     <Compile Include="JoinCommand_EventHandler.cs" />
+    <Compile Include="OnOff.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="OnOff.Designer.cs">
+      <DependentUpon>OnOff.cs</DependentUpon>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="OnOff.resx">
+      <DependentUpon>OnOff.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
