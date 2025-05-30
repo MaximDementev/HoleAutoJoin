@@ -1,75 +1,196 @@
 ﻿using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
-using Autodesk.Revit.DB.Events;
 using System.Linq;
 using System.IO;
 using System.Reflection;
 using System;
 using System.Windows.Media.Imaging;
+using HoleAutoJoin.Core;
+using HoleAutoJoin.Services;
+using HoleAutoJoin.Commands;
 using System.Collections.Generic;
 
-public class AutoJoinOpening : IExternalApplication
+namespace HoleAutoJoin
 {
-    private JoinCommand_EventHandler _joinCommand_EventHandler;
-    private JoinCommand _joinCommand;
-
-    public Result OnStartup(UIControlledApplication application)
+    public class AutoJoinOpening : IExternalApplication
     {
-        _joinCommand_EventHandler = new JoinCommand_EventHandler();
-        _joinCommand = new JoinCommand();
-        JoinCommand.Init(_joinCommand_EventHandler);
-        application.ControlledApplication.DocumentChanged += OnDocumentChanged;
+        #region Constants
+        private const string TAB_NAME = "KRGPMagic";
+        private const string PANEL_NAME = "Проемы и отверстия";
+        #endregion
 
-
-        //-----------------------------------------
-        string assemblyLocation = Assembly.GetExecutingAssembly().Location,iconsDirectoryPath = Path.GetDirectoryName(assemblyLocation) + @"\icons\";
-
-        string panelName = "Проемы и отверстия";
-        string ribbonName = "Соединить отверстия с плитой";
-
-        #region 1. SPECIFIC
+        #region IExternalApplication Implementation
+        public Result OnStartup(UIControlledApplication application)
         {
-            IList<RibbonPanel> panels = application.GetRibbonPanels(Tab.AddIns);
-            RibbonPanel panel = panels.FirstOrDefault(p => p.Name == panelName);
-            if (panel == null)panel = application.CreateRibbonPanel(Tab.AddIns, panelName);
-
-            panel.AddItem(new PushButtonData(nameof(JoinCommand), ribbonName, assemblyLocation, typeof(JoinCommand).FullName)
+            try
             {
-                LargeImage = new BitmapImage(new Uri(iconsDirectoryPath + "HoleAutoJoinIco.png")),
-                LongDescription = "Соединение отверстий выполняется автоматически. Запускать при необходимости. " +
-                "Соединяет все отверстия в плитах с их основами. Перед запуском рекомендуется синхронизироваться"
-            });
+                // Инициализация CommandFactory и его сервисов
+                CommandFactory.Instance.Initialize(application);
+
+                // Создание пользовательского интерфейса
+                CreateUserInterface(application);
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Ошибка инициализации плагина", ex.Message);
+                return Result.Failed;
+            }
+        }
+
+        public Result OnShutdown(UIControlledApplication application)
+        {
+            try
+            {
+                // Отписываемся от событий при закрытии Revit
+                CommandFactory.Instance.AutoJoinService?.Shutdown();
+                return Result.Succeeded;
+            }
+            catch
+            {
+                return Result.Failed;
+            }
         }
         #endregion
 
-        return Result.Succeeded;
-    }
-
-    public Result OnShutdown(UIControlledApplication application)
-    {
-        application.ControlledApplication.DocumentChanged -= OnDocumentChanged;
-        return Result.Succeeded;
-    }
-
-    private void OnDocumentChanged(object sender, DocumentChangedEventArgs e)
-    {
-        try
+        #region Private Methods
+        private void CreateUserInterface(UIControlledApplication application)
         {
-            Document doc = e.GetDocument();
-            if (doc == null) return;
+            string assemblyLocation = Assembly.GetExecutingAssembly().Location;
+            string iconsDirectoryPath = Path.GetDirectoryName(assemblyLocation) + @"\icons\";
 
-            var changedOrAddedElements = new FilteredElementCollector(doc)
-                .OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
-                .Where(fi => fi.Symbol.Family.Name.StartsWith("Отверстие_Плита_"))
-                .ToList();
+            // Создаем или находим вкладку KRGPMagic
+            CreateOrFindTab(application, TAB_NAME);
 
-            if (changedOrAddedElements.Any())
-                _joinCommand_EventHandler.Raise(changedOrAddedElements);
+            // Создаем или находим панель
+            RibbonPanel panel = GetOrCreatePanel(application, TAB_NAME, PANEL_NAME);
+
+            // Загрузка иконок
+            var joinIcons = LoadIconPair(iconsDirectoryPath, "HoleAutoJoinIco");
+            var settingsIcons = LoadIconPair(iconsDirectoryPath, "Settings");
+            var helpIcons = LoadIconPair(iconsDirectoryPath, "Help");
+
+
+            // Создаем данные для кнопки "Соединить отверстия"
+            PushButtonData joinButtonData = new PushButtonData(
+                "JoinCommand",
+                "Соединить\nотверстия",
+                assemblyLocation,
+                typeof(JoinCommand).FullName)
+            {
+                ToolTip = "Соединяет все отверстия в плитах с их основами (ручной режим)",
+                LargeImage = joinIcons.Large,
+                Image = joinIcons.Small
+            };
+
+            // Создаем данные для кнопки "Настройки соединения"
+            PushButtonData settingsButtonData = new PushButtonData(
+                "SettingsCommand",
+                "Настройки\nсоединения",
+                assemblyLocation,
+                typeof(SettingsCommand).FullName)
+            {
+                ToolTip = "Открыть настройки автоматического и ручного соединения отверстий",
+                LargeImage = settingsIcons.Large,
+                Image = settingsIcons.Small
+            };
+
+            // Создаем данные для кнопки "Справка по отверстиям"
+            PushButtonData helpButtonData = new PushButtonData(
+                "HelpCommand",
+                "Справка по\nотверстиям",
+                assemblyLocation,
+                typeof(HelpCommand).FullName)
+            {
+                ToolTip = "Открыть справку с инструкциями по работе с отверстиями",
+                LargeImage = helpIcons.Large,
+                Image = helpIcons.Small
+            };
+
+            // Создаем SplitButton
+            SplitButtonData splitButtonData = new SplitButtonData("splitButtonHoleJoin", "Соединение");
+            SplitButton splitButton = panel.AddItem(splitButtonData) as SplitButton;
+
+            if (splitButton != null)
+            {
+                // Добавляем кнопки в SplitButton
+                splitButton.AddPushButton(joinButtonData);
+                splitButton.AddPushButton(settingsButtonData);
+                splitButton.AddPushButton(helpButtonData); // Добавляем кнопку справки
+
+                // Устанавливаем "Соединить отверстия" как текущую кнопку
+                splitButton.IsSynchronizedWithCurrentItem = true;
+            }
         }
-        catch (Exception ex)
+
+        private void CreateOrFindTab(UIControlledApplication application, string tabName)
         {
-            TaskDialog.Show("Ошибка", $"{ex.Message}");
+            try
+            {
+                application.CreateRibbonTab(tabName);
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Ошибка создания вкладки", $"Не удалось создать вкладку {tabName}: {ex.Message}");
+            }
         }
-    }
 
+        private RibbonPanel GetOrCreatePanel(UIControlledApplication application, string tabName, string panelName)
+        {
+            try
+            {
+                // Ищем существующую панель
+                var panels = application.GetRibbonPanels(tabName);
+                var existingPanel = panels.FirstOrDefault(p => p.Name == panelName);
+
+                if (existingPanel != null)
+                    return existingPanel;
+
+                // Создаем новую панель
+                return application.CreateRibbonPanel(tabName, panelName);
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Ошибка создания панели", $"Не удалось создать панель {panelName}: {ex.Message}");
+                // Возвращаем панель из вкладки Add-Ins как fallback
+                return application.CreateRibbonPanel(Tab.AddIns, panelName);
+            }
+        }
+
+        private IconPair LoadIconPair(string iconsPath, string baseName)
+        {
+            return new IconPair
+            {
+                Large = LoadIcon(Path.Combine(iconsPath, $"{baseName}.png")),
+                Small = LoadIcon(Path.Combine(iconsPath, $"{baseName}_small.png")) ??
+                       LoadIcon(Path.Combine(iconsPath, $"{baseName}.png")) // Fallback к большой иконке
+            };
+        }
+
+        private BitmapImage LoadIcon(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    return new BitmapImage(new Uri(path));
+                }
+            }
+            catch (Exception ex)
+            {
+                // Можно добавить логирование, если нужно
+            }
+            return null;
+        }
+        #endregion
+
+        #region Helper Classes
+        private class IconPair
+        {
+            public BitmapImage Large { get; set; }
+            public BitmapImage Small { get; set; }
+        }
+        #endregion
+    }
 }
