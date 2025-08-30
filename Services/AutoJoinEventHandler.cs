@@ -12,24 +12,27 @@ namespace HoleAutoJoin.Services
     public class AutoJoinEventHandler : IAutoJoinService, IExternalEventHandler
     {
         #region Fields
-        private readonly ControlledApplication _application;
+        private readonly Application _application;
         private readonly IHoleFilter _holeFilter;
         private readonly ExternalEvent _externalEvent;
         private readonly HashSet<ElementId> _elementsToProcess = new HashSet<ElementId>();
         private Document _currentDocument;
-        private bool _isEnabled;
         #endregion
 
         #region Properties
         public bool IsEnabled
         {
-            get => _isEnabled;
-            set => _isEnabled = value;
+            get => SettingsManager.Instance.Settings.IsAutoJoinEnabled;
+            set
+            {
+                SettingsManager.Instance.Settings.IsAutoJoinEnabled = value;
+                SettingsManager.Instance.SaveSettings();
+            }
         }
         #endregion
 
         #region Constructor
-        public AutoJoinEventHandler(ControlledApplication application, IHoleFilter holeFilter)
+        public AutoJoinEventHandler(Application application, IHoleFilter holeFilter)
         {
             _application = application ?? throw new ArgumentNullException(nameof(application));
             _holeFilter = holeFilter ?? throw new ArgumentNullException(nameof(holeFilter));
@@ -52,7 +55,7 @@ namespace HoleAutoJoin.Services
         #region Event Handlers
         private void OnDocumentChanged(object sender, DocumentChangedEventArgs e)
         {
-            if (!_isEnabled) return;
+            if (!SettingsManager.Instance.Settings.IsAutoJoinEnabled) return;
 
             try
             {
@@ -90,7 +93,7 @@ namespace HoleAutoJoin.Services
                     _externalEvent.Raise();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Игнорируем ошибки в обработчике события
             }
@@ -147,6 +150,11 @@ namespace HoleAutoJoin.Services
                 if (!JoinGeometryUtils.AreElementsJoined(_currentDocument, familyInstance, familyInstance.Host))
                 {
                     JoinGeometryUtils.JoinGeometry(_currentDocument, familyInstance, familyInstance.Host);
+
+                    if (SettingsManager.Instance.Settings.ShowNotifications)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[AutoJoin] Соединено отверстие {familyInstance.Id} с элементом {familyInstance.Host.Id}");
+                    }
                 }
             }
             catch

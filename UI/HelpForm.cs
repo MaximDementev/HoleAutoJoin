@@ -35,7 +35,47 @@ namespace HoleAutoJoin.UI
 
         private void SetupLinks()
         {
-            int yPosition = 60;
+            var userGuideText = @"ОПИСАНИЕ
+Плагин для автоматического соединения отверстий с плитами в Revit. Работает с семействами отверстий, названия которых начинаются с ""Отверстие_Плита_"".
+
+ОСНОВНЫЕ КОМАНДЫ
+
+Настройки:
+• Автосоединение: Включает/выключает автоматическое соединение отверстий при их создании или изменении
+• Показывать уведомления: Управляет отображением сообщений о результатах соединения
+• Соединить сейчас: Ручное соединение всех отверстий в текущем документе
+
+Ручное соединение:
+Выполняет разовое соединение всех найденных отверстий с их основаниями в текущем документе.
+
+ПРИНЦИП РАБОТЫ
+1. Автоматический режим: При включенном автосоединении плагин отслеживает создание и изменение отверстий, автоматически соединяя их с плитами
+2. Ручной режим: Команда ""Соединить сейчас"" в настройках выполняет соединение всех отверстий единовременно
+3. Настройки сохраняются между сессиями Revit в папке пользователя
+
+ТРЕБОВАНИЯ
+• Семейства отверстий должны иметь названия, начинающиеся с ""Отверстие_Плита_""
+• Отверстия должны иметь корректные основания - плиты перекрытия (host elements)
+
+ПОЛЕЗНЫЕ ССЫЛКИ:";
+
+            var textBox = new TextBox
+            {
+                Text = userGuideText,
+                Location = new Point(20, 60),
+                Size = new Size(this.Width - 60, 280),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular),
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BackColor = SystemColors.Control,
+                BorderStyle = BorderStyle.None
+            };
+
+            this.Controls.Add(textBox);
+
+            int yPosition = 350;
             const int linkHeight = 30;
             const int margin = 10;
 
@@ -58,7 +98,6 @@ namespace HoleAutoJoin.UI
                 yPosition += linkHeight + margin;
             }
 
-            // Обновляем размер формы под количество ссылок
             this.Height = yPosition + 80;
         }
 
@@ -106,7 +145,7 @@ namespace HoleAutoJoin.UI
 
             // btnClose
             this.btnClose.Anchor = ((AnchorStyles)((AnchorStyles.Bottom | AnchorStyles.Right)));
-            this.btnClose.Location = new Point(297, 200);
+            this.btnClose.Location = new Point(297, 460);
             this.btnClose.Name = "btnClose";
             this.btnClose.Size = new Size(75, 23);
             this.btnClose.TabIndex = 1;
@@ -117,7 +156,7 @@ namespace HoleAutoJoin.UI
             // HelpForm
             this.AutoScaleDimensions = new SizeF(6F, 13F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(400, 240);
+            this.ClientSize = new Size(400, 500);
             this.Controls.Add(this.btnClose);
             this.Controls.Add(this.lblTitle);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;

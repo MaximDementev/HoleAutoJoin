@@ -1,40 +1,35 @@
+using Autodesk.Revit.ApplicationServices;
+using Autodesk.Revit.Attributes;
 using Autodesk.Revit.UI;
-using Autodesk.Revit.DB;
-using System.Linq;
-using System.IO;
-using System.Reflection;
-using System;
-using System.Windows.Media.Imaging;
-using HoleAutoJoin.Core;
-using HoleAutoJoin.Services;
 using HoleAutoJoin.Commands;
-using System.Collections.Generic;
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Windows.Media.Imaging;
 
 namespace HoleAutoJoin
 {
+    [Transaction(TransactionMode.Manual)]
+    [Regeneration(RegenerationOption.Manual)]
     public class AutoJoinOpening : IExternalApplication
     {
-        #region Constants
         private const string TAB_NAME = "KRGPMagic";
-        private const string PANEL_NAME = "Проемы и отверстия";
-        #endregion
+        private const string PANEL_NAME = "Отверстия";
 
-        #region IExternalApplication Implementation
         public Result OnStartup(UIControlledApplication application)
         {
             try
             {
-                // Инициализация CommandFactory и его сервисов
-                CommandFactory.Instance.Initialize(application);
-
-                // Создание пользовательского интерфейса
                 CreateUserInterface(application);
+
+                CommandFactory.Instance.InitializeOnStartup(application.ControlledApplication);
 
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Ошибка инициализации плагина", ex.Message);
+                System.Diagnostics.Debug.WriteLine($"[AutoJoinOpening] Error during startup: {ex.Message}");
                 return Result.Failed;
             }
         }
@@ -43,16 +38,15 @@ namespace HoleAutoJoin
         {
             try
             {
-                // Отписываемся от событий при закрытии Revit
-                CommandFactory.Instance.AutoJoinService?.Shutdown();
+                CommandFactory.Instance.ShutdownServices();
                 return Result.Succeeded;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[AutoJoinOpening] Error during shutdown: {ex.Message}");
                 return Result.Failed;
             }
         }
-        #endregion
 
         #region Private Methods
         private void CreateUserInterface(UIControlledApplication application)
@@ -70,7 +64,6 @@ namespace HoleAutoJoin
             var joinIcons = LoadIconPair(iconsDirectoryPath, "HoleAutoJoinIco");
             var settingsIcons = LoadIconPair(iconsDirectoryPath, "Settings");
             var helpIcons = LoadIconPair(iconsDirectoryPath, "Help");
-
 
             // Создаем данные для кнопки "Соединить отверстия"
             PushButtonData joinButtonData = new PushButtonData(
@@ -117,7 +110,7 @@ namespace HoleAutoJoin
                 // Добавляем кнопки в SplitButton
                 splitButton.AddPushButton(joinButtonData);
                 splitButton.AddPushButton(settingsButtonData);
-                splitButton.AddPushButton(helpButtonData); // Добавляем кнопку справки
+                splitButton.AddPushButton(helpButtonData);
 
                 // Устанавливаем "Соединить отверстия" как текущую кнопку
                 splitButton.IsSynchronizedWithCurrentItem = true;
@@ -177,7 +170,7 @@ namespace HoleAutoJoin
                     return new BitmapImage(new Uri(path));
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Можно добавить логирование, если нужно
             }

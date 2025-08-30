@@ -1,9 +1,10 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using HoleAutoJoin.Services;
-using HoleAutoJoin.UI;
 using System;
+using HoleAutoJoin; // Для доступа к CommandFactory
+using HoleAutoJoin.Services; // Для доступа к IAutoJoinService, IManualJoinService
+using HoleAutoJoin.UI; // Для доступа к HoleJoinSettingsForm
 
 namespace HoleAutoJoin.Commands
 {
@@ -12,26 +13,21 @@ namespace HoleAutoJoin.Commands
     public class SettingsCommand : IExternalCommand
     {
         #region Fields
-        private readonly IAutoJoinService _autoJoinService;
-        private readonly IManualJoinService _manualJoinService;
+        private IAutoJoinService _autoJoinService;
+        private IManualJoinService _manualJoinService;
         #endregion
 
-        #region Constructors
-        public SettingsCommand()
-        {
-            _autoJoinService = CommandFactory.Instance.AutoJoinService;
-            _manualJoinService = CommandFactory.Instance.ManualJoinService;
+        #region IPlugin Implementation
+        public bool IsEnabled { get; set; }
 
-            if (_autoJoinService == null)
-            {
-                Autodesk.Revit.UI.TaskDialog.Show("Ошибка инициализации", $"{nameof(IAutoJoinService)} не доступен.");
-                throw new InvalidOperationException($"{nameof(IAutoJoinService)} не был инициализирован в {nameof(CommandFactory)}.");
-            }
-            if (_manualJoinService == null)
-            {
-                Autodesk.Revit.UI.TaskDialog.Show("Ошибка инициализации", $"{nameof(IManualJoinService)} не доступен.");
-                throw new InvalidOperationException($"{nameof(IManualJoinService)} не был инициализирован в {nameof(CommandFactory)}.");
-            }
+        public bool Initialize()
+        {
+            return true;
+        }
+
+        public void Shutdown()
+        {
+            CommandFactory.Instance.ShutdownServices();
         }
         #endregion
 
@@ -40,6 +36,25 @@ namespace HoleAutoJoin.Commands
         {
             try
             {
+                if (commandData?.Application?.Application == null)
+                {
+                    message = "Не удалось получить доступ к приложению Revit.";
+                    TaskDialog.Show("Ошибка", message);
+                    return Result.Failed;
+                }
+
+                CommandFactory.Instance.EnsureServicesInitialized(commandData);
+
+                _autoJoinService = CommandFactory.Instance.AutoJoinService;
+                _manualJoinService = CommandFactory.Instance.ManualJoinService;
+
+                if (_manualJoinService == null)
+                {
+                    message = "ManualJoinService не инициализирован.";
+                    TaskDialog.Show("Settings Command", message);
+                    return Result.Failed;
+                }
+
                 using (var form = new HoleJoinSettingsForm(_autoJoinService, _manualJoinService))
                 {
                     form.ShowDialog();
@@ -48,7 +63,9 @@ namespace HoleAutoJoin.Commands
             }
             catch (Exception ex)
             {
-                message = ex.Message;
+                message = $"Ошибка при открытии настроек: {ex.Message}";
+                TaskDialog.Show( "Settings Command Error",
+                    $"Произошла ошибка:\n{ex.Message}\n\nДетали:\n{ex.ToString()}");
                 return Result.Failed;
             }
         }
