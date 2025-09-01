@@ -15,7 +15,7 @@ namespace HoleAutoJoin
     public class AutoJoinOpening : IExternalApplication
     {
         private const string TAB_NAME = "KRGPMagic";
-        private const string PANEL_NAME = "Отверстия";
+        private const string PANEL_NAME = "Проемы и отверстия";
 
         public Result OnStartup(UIControlledApplication application)
         {
